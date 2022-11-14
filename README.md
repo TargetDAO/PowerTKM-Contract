@@ -1,6 +1,10 @@
-# Sample Hardhat Project
+# PowerTKM Contract
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+
+
+PowerTKM is a fully decentralized instant-play instant-win lottery game. It is smart contracts based. It matches the winning number and rewards the winning player automatically. There is no human intervention.
+
+PowerTKM treats people equally, and nothing can stop it from doing that. You play, you win, and it rewards you.
 
 Try running some of the following tasks:
 
