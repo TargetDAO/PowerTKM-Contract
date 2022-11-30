@@ -1,7 +1,44 @@
 //SPDX-License-Identifier: SimPL-2.0
 pragma solidity ^0.8.0;
 
+contract RandomNum {
+    address manager;
+    constructor(){
+        manager = msg.sender;
+    }
+    modifier onlyManager{
+        require(msg.sender == manager);
+        _;
+    }
+    event getOne(uint256 num);
+    mapping(string=>mapping(uint256=>uint256[])) dapp_random_num;
+    function setRandom(string memory token,uint256 num_type,uint256[] memory list_num)public  onlyManager {
+        dapp_random_num[token][num_type]=list_num;
 
+    }
+
+    function addRandom(string memory token,uint256 num_type,uint256[] memory list_num)public  onlyManager {
+        for(uint256 i=0;i<list_num.length;i++){
+            dapp_random_num[token][num_type].push(list_num[i]);
+        }
+    }
+    function getRandomNum(string memory token,uint256 num_type) view public returns (uint256[] memory){
+        return dapp_random_num[token][num_type];
+    }
+
+    function getNumLength(string memory token,uint256 num_type) view public returns (uint256){
+        return dapp_random_num[token][num_type].length;
+    }
+
+    function getOneRandomNum(string memory token,uint256 num_type)view public returns(uint256){
+        uint256[]memory nums=dapp_random_num[token][num_type];
+        uint256 result=nums[nums.length-1];
+        return result;
+    }
+    function removeLast(string memory token,uint256 num_type)public{
+        dapp_random_num[token][num_type].pop();
+    }
+}
 
 
 contract NewLuck {
@@ -52,16 +89,16 @@ contract NewLuck {
         uint256 amount;
         uint256 userProportion;
     }
-
-
+    uint256 donation_start_time=1669294800;
+    uint256 donation_end_time=1669824000;//
     address tech_wallet=0xF0aDf6B8cE0e771883027Fc48a15c41263d4FB3c;
-    address random_addr=0x3398986F2dF0D0B683DED915B3A7f6135aB050f0;
+    address random_addr=0x4aE5D5BA5fC4323f5c7233992f5FE05967294B6D;
+    // address random_addr=0x3398986F2dF0D0B683DED915B3A7f6135aB050f0;
     string random_token="dapp_001_00001";
     RandomNum myRandomNum;
     address manager;
     uint256 total_bonus = 0*(10**18);
     uint256 total_donations=0*(10**18);
-    bool can_buy=false;
     mapping(address => uint256) user_balances;
     mapping (uint8=>mapping(uint256=>bool)) list_nums_is_win;
     mapping(uint8=>uint256[]) prize_num_list;
@@ -102,10 +139,10 @@ contract NewLuck {
     constructor(){
         manager = msg.sender;
     }
-
     function play(address recomm) payable public {
+        require(msg.sender == tx.origin,"not user!");
         require(msg.value == 10 ether, "please pay 10 tkm");
-        require(can_buy, "some users have won the grand prize, waiting for the platform settlement");
+        require(block.timestamp>donation_end_time,"game start soon");
         myRandomNum=RandomNum(random_addr);
         uint256 _lotNumber = myRandomNum.getOneRandomNum(random_token,111);
         _lotNumber=uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty,_lotNumber,total_bonus))) % 1000000;
@@ -126,11 +163,13 @@ contract NewLuck {
         uint256 last_prize = 8*(10**18);
         bool is_big_bonus = false;
         if(list_nums_is_win[0][(_lotNumber % (10 ** 6))]){
-            user_prize = total_bonus * 45 / 100;
+            user_prize = total_bonus * 405 / 1000 ;
+            payable(address(1)).transfer(total_bonus* 45/1000);
             prize_level=6;
             is_big_bonus = true;
         }else if(list_nums_is_win[1][(_lotNumber % (10 ** 5))]){
-            user_prize = total_bonus * 25 / 1000;
+            user_prize = total_bonus * 225 / 10000;
+            payable(address(1)).transfer(total_bonus* 25/10000);
             prize_level=5;
             is_big_bonus = true;
         }else if(list_nums_is_win[2][(_lotNumber % (10 ** 4))]){
@@ -188,10 +227,7 @@ contract NewLuck {
         emit PlayResult(msg.sender, _lotNumber, user_prize > 0, user_prize);
     }
 
-    function setRandomAddr(address mAddr,string memory  mToken) public onlyManager{
-        random_addr=mAddr;
-        random_token=mToken;
-    }
+
     function clear_all_num()private onlyManager{
         for(uint8 i=0;i<5;i++){
             while (prize_num_list[i].length > 0) {
@@ -212,9 +248,7 @@ contract NewLuck {
             }
         }
     }
-    function setCanBuy(bool mcan_buy) onlyManager public{
-        can_buy=mcan_buy;
-    }
+
     function checkWithdraw(uint256 id,address user,uint256 time,uint256 amount)public  onlyManager {
         if(withdraw_all_list[id].status==0&&withdraw_all_list[id].user==user&&withdraw_all_list[id].time==time&&withdraw_all_list[id].amount==amount){
             withdraw_all_list[id].status=1;
@@ -227,12 +261,14 @@ contract NewLuck {
     }
 
     function make_donations() payable public{
-        uint256 per_num=1000;
-        uint256 start_num=100;
-        require(can_donation,"Has stopped accepting donations");
-        require(msg.value >= (per_num*10**18),"donations only accepts more than 10000");
-        require(donations_num <= 500,"The maximum number of donors is 100");
-        require((msg.value%(per_num*10**18)==0),"The donation amount must be a multiple of 10000");
+        uint256 per_num=10000;
+        require(msg.sender == tx.origin,"not user!");
+        require(can_donation,"Has stopped accepting fundraising");
+        require(block.timestamp>donation_start_time,"The fundraising has not started yet");
+        require(block.timestamp<donation_end_time,"The fundraising has ended");
+        require((msg.value%(per_num*10**18)==0),"The fundraising amount must be a multiple of 10000");
+        require(donations_num <= 500,"The maximum number of fundraising is 100");
+
         uint256 number=msg.value;
         uint256 num=number/(per_num*10**18);
         require((num+user_donation_num[msg.sender])<=5,"The max donation times mush less than 5");
@@ -240,20 +276,14 @@ contract NewLuck {
         total_bonus=total_bonus+number;
         donations_num=num+donations_num;
         donation_list.push(Donations(donation_list.length+1,msg.sender,block.timestamp,msg.value));
-
-
-        if(total_donations>=(start_num*per_num*10**18)){
-            can_buy=true;
-        }
-
         if(user_donation_num[msg.sender]>0){
             user_donation_num[msg.sender]=user_donation_num[msg.sender]+num;
         }else{
             user_donation_num[msg.sender]=num;
             donation_users.push(msg.sender);
         }
-
         if(donation_users.length>=100){
+            donation_end_time-block.timestamp;
             can_donation=false;
         }
         for (uint256 i = 0; i < donation_users.length; i++) {
@@ -460,9 +490,7 @@ contract NewLuck {
         return list_result;
     }
 
-    function getCanBuy() view public returns(bool){
-        return can_buy;
-    }
+
     function getUserBalance() view public returns (uint256){
         return user_balances[msg.sender];
     }
@@ -477,43 +505,4 @@ contract NewLuck {
     }
 
 
-}
-
-contract RandomNum {
-    address manager;
-    constructor(){
-        manager = msg.sender;
-    }
-    modifier onlyManager{
-        require(msg.sender == manager);
-        _;
-    }
-    event getOne(uint256 num);
-    mapping(string=>mapping(uint256=>uint256[])) dapp_random_num;
-    function setRandom(string memory token,uint256 num_type,uint256[] memory list_num)public  onlyManager {
-        dapp_random_num[token][num_type]=list_num;
-
-    }
-
-    function addRandom(string memory token,uint256 num_type,uint256[] memory list_num)public  onlyManager {
-        for(uint256 i=0;i<list_num.length;i++){
-            dapp_random_num[token][num_type].push(list_num[i]);
-        }
-    }
-    function getRandomNum(string memory token,uint256 num_type) view public returns (uint256[] memory){
-        return dapp_random_num[token][num_type];
-    }
-
-    function getNumLength(string memory token,uint256 num_type) view public returns (uint256){
-        return dapp_random_num[token][num_type].length;
-    }
-
-    function getOneRandomNum(string memory token,uint256 num_type)view public returns(uint256){
-        uint256[]memory nums=dapp_random_num[token][num_type];
-        uint256 result=nums[nums.length-1];
-        return result;
-    }
-    function removeLast(string memory token,uint256 num_type)public{
-        dapp_random_num[token][num_type].pop();
-    }
 }
